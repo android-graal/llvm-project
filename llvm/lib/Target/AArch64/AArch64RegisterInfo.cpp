@@ -30,6 +30,7 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Triple.h"
 
@@ -39,6 +40,11 @@ using namespace llvm;
 #include "AArch64GenCallingConv.inc"
 #define GET_REGINFO_TARGET_DESC
 #include "AArch64GenRegisterInfo.inc"
+
+static cl::opt<bool>
+    FrameRecordOnTop("aarch64-frame-record-on-top",
+                     cl::desc("place the frame record on top of the frame"),
+                     cl::init(false), cl::Hidden);
 
 AArch64RegisterInfo::AArch64RegisterInfo(const Triple &TT, unsigned HwMode)
     : AArch64GenRegisterInfo(AArch64::LR, 0, 0, 0, HwMode), TT(TT) {
@@ -188,8 +194,11 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     if (Windows)
       return AFI.hasSVE_AAPCS(*MF) ? CSR_Win_AArch64_SVE_AAPCS_SaveList
                                    : CSR_Win_AArch64_AAPCS_SaveList;
-    return AFI.hasSVE_AAPCS(*MF) ? CSR_AArch64_SVE_AAPCS_SaveList
-                                 : CSR_AArch64_AAPCS_SaveList;
+    if (AFI.hasSVE_AAPCS(*MF))
+      return CSR_AArch64_SVE_AAPCS_SaveList;
+    if (FrameRecordOnTop)
+      return CSR_Darwin_AArch64_AAPCS_SaveList;
+    return CSR_AArch64_AAPCS_SaveList;
   }
 }
 
